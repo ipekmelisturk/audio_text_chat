@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot App</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Chatbot Application</h1>
+        <div id="chat-box">
+            <div id="messages"></div>
+        </div>
+        <form id="chat-form">
+            <label for="duration">Audio Duration (seconds):</label>
+            <input type="number" id="duration" name="duration" min="1" max="60" value="5">
+            <button type="submit">Record & Chat</button>
+        </form>
+    </div>
+    <script>
+        const form = document.getElementById("chat-form");
+        const messages = document.getElementById("messages");
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const duration = document.getElementById("duration").value;
+
+            const formData = new FormData();
+            formData.append("duration", duration);
+
+            messages.innerHTML += "<p><b>User:</b> Recording audio...</p>";
+
+            try {
+                const response = await fetch("/process_audio_and_chat", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    messages.innerHTML += `<p><b>Error:</b> ${data.error}</p>`;
+                } else {
+                    messages.innerHTML += `<p><b>Transcription:</b> ${data.transcription}</p>`;
+                    messages.innerHTML += `<p><b>Chatbot:</b> ${data.chat_response}</p>`;
+                }
+            } catch (err) {
+                messages.innerHTML += `<p><b>Error:</b> ${err.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
