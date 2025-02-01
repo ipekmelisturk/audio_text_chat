@@ -1,7 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-from audio_record import record_audio
-from audio_to_text import save_audio, transcribe_audio
-from chat_agent import chat_with_agent
+from agents import agent_1_suggest_questions, agent_2_diagnose
 
 app = Flask(__name__)
 
@@ -9,33 +7,38 @@ app = Flask(__name__)
 def home():
     return render_template("index.html")
 
-@app.route("/process_audio_and_chat", methods=["POST"])
-def process_audio_and_chat():
+@app.route("/analyze_input", methods=["POST"])
+def analyze_input():
     """
-    Handles audio recording, transcription, and chatbot responses.
+    API Route: Accepts text input, provides possible causes,
+    and then suggests questions.
     """
+    patient_input = request.form.get("message", "").strip()
+    previous_questions = request.form.get("previous_questions", "[]")  # Get previous questions
+    previous_questions = eval(previous_questions) if previous_questions else []
+
+    if not patient_input:
+        return jsonify({"error": "No input received"})
+
     try:
-        duration = int(request.form.get("duration", 5))
+        print(f"Received patient input: {patient_input}")  # Debugging
 
-        # Step 1: Record Audio
-        audio_data = record_audio(duration)
+        # Step 1: Get possible causes
+        diagnosis = agent_2_diagnose(patient_input)
+        print(f"Diagnosis returned: {diagnosis}")  # Debugging
 
-        # Step 2: Save the Audio File
-        file_name = "recorded_audio.wav"
-        save_audio(file_name, audio_data)
-
-        # Step 3: Transcribe Audio
-        transcription = transcribe_audio(file_name)
-
-        # Step 4: Get Chat Response
-        chat_response = chat_with_agent(transcription)
+        # Step 2: Get **NEW** suggested questions
+        questions_data = agent_1_suggest_questions(patient_input, previous_questions)
+        print(f"Suggested Questions returned: {questions_data}")  # Debugging
 
         return jsonify({
-            "transcription": transcription,
-            "chat_response": chat_response
+            "causes": diagnosis if diagnosis else [],  # ✅ Ensures no null values
+            "questions": questions_data["questions"]  # ✅ Dynamic questions
         })
+
     except Exception as e:
-        return jsonify({"error": str(e)})
+        print(f"Error in /analyze_input: {e}")  # Debugging error
+        return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

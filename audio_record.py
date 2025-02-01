@@ -1,6 +1,8 @@
 import sounddevice as sd
 import numpy as np
 
+
+#
 def record_audio(duration=5, sample_rate=16000):
     """
     Record audio using sounddevice for the specified duration and sample rate.

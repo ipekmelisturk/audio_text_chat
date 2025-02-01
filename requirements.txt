@@ -1,0 +1,7 @@
+Flask
+openai
+python-dotenv
+sounddevice
+whisper
+numpy
+scipy

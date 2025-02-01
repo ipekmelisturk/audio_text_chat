@@ -3,51 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chatbot App</title>
+    <title>Medical Chatbot</title>
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Chart.js for graphs -->
 </head>
 <body>
     <div class="container">
-        <h1>Chatbot Application</h1>
-        <div id="chat-box">
-            <div id="messages"></div>
+        <h1>Medical Chat Assistant</h1>
+        <div class="row">
+            <div class="box chat-box" id="chat-box">
+                <h2>Chat</h2>
+                <div id="messages"></div>
+                <form id="chat-form">
+                    <input type="text" id="chat-input" placeholder="Type your message here...">
+                    <button type="submit">Send</button>
+                </form>
+            </div>
+            <div class="box questions-box">
+                <h2>Suggested Questions</h2>
+                <ul id="questions-list"></ul>
+            </div>
         </div>
-        <form id="chat-form">
-            <label for="duration">Audio Duration (seconds):</label>
-            <input type="number" id="duration" name="duration" min="1" max="60" value="5">
-            <button type="submit">Record & Chat</button>
-        </form>
+    
+        <div class="likelihood-box">
+            <h2>Possible Causes & Likelihood</h2>
+            <div id="chart-container">
+                <canvas id="causes-chart"></canvas> <!-- ✅ Ensure canvas exists -->
+            </div>
+        </div>
     </div>
+    
+
     <script>
-        const form = document.getElementById("chat-form");
-        const messages = document.getElementById("messages");
-
-        form.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const duration = document.getElementById("duration").value;
-
+        let previousQuestions = [];  // Store past questions
+        let likelihoodChart = null;  // Store chart instance globally
+    
+        document.getElementById("chat-form").addEventListener("submit", async function(event) {
+            event.preventDefault();
+            const inputField = document.getElementById("chat-input");
+            const userMessage = inputField.value.trim();
+            if (userMessage === "") return;
+    
+            const chatBox = document.getElementById("messages");
+            chatBox.innerHTML += `<p><b>User:</b> ${userMessage}</p>`;
+    
             const formData = new FormData();
-            formData.append("duration", duration);
-
-            messages.innerHTML += "<p><b>User:</b> Recording audio...</p>";
-
+            formData.append("message", userMessage);
+            formData.append("previous_questions", JSON.stringify(previousQuestions));
+    
             try {
-                const response = await fetch("/process_audio_and_chat", {
+                const response = await fetch("/analyze_input", {
                     method: "POST",
                     body: formData,
                 });
-
                 const data = await response.json();
+    
                 if (data.error) {
-                    messages.innerHTML += `<p><b>Error:</b> ${data.error}</p>`;
-                } else {
-                    messages.innerHTML += `<p><b>Transcription:</b> ${data.transcription}</p>`;
-                    messages.innerHTML += `<p><b>Chatbot:</b> ${data.chat_response}</p>`;
+                    chatBox.innerHTML += `<p><b>Error:</b> ${data.error}</p>`;
+                    return;
                 }
+    
+                // ✅ Update suggested questions dynamically
+                updateQuestionsList(data.questions);
+                previousQuestions = data.questions;  // Store new questions to avoid repetition
+    
+                // ✅ Reset and update likelihood chart
+                resetChartCanvas(); // Properly reset canvas to avoid growth
+                updateCausesChart(data.causes);
             } catch (err) {
-                messages.innerHTML += `<p><b>Error:</b> ${err.message}</p>`;
+                console.error(err);
+                chatBox.innerHTML += `<p><b>Error:</b> Unable to process request.</p>`;
             }
+    
+            inputField.value = ""; 
         });
+    
+        function updateQuestionsList(questions) {
+            const questionsList = document.getElementById("questions-list");
+            questionsList.innerHTML = ""; // ✅ Clear previous questions
+    
+            questions.slice(0, 5).forEach(q => {
+                const li = document.createElement("li");
+                li.textContent = q;
+                questionsList.appendChild(li);
+            });
+        }
+    
+        function resetChartCanvas() {
+            const chartContainer = document.getElementById("chart-container");
+            chartContainer.innerHTML = '<canvas id="causes-chart"></canvas>'; // ✅ Completely reset canvas before updating
+        }
+    
+        function updateCausesChart(causes) {
+            const ctx = document.getElementById("causes-chart").getContext("2d");
+    
+            // ✅ Destroy existing chart if it exists to prevent stacking
+            if (likelihoodChart) {
+                likelihoodChart.destroy();
+            }
+    
+            // ✅ Ensure valid causes are displayed
+            const labels = causes.map(c => c.name);
+            const dataValues = causes.map(c => c.percentage);
+    
+            // ✅ Set fixed chart height to prevent infinite page growth
+            document.getElementById("chart-container").style.height = "300px";
+    
+            likelihoodChart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: "Likelihood (%)",
+                        data: dataValues,
+                        backgroundColor: "rgba(75, 192, 192, 0.6)",
+                        borderColor: "rgba(75, 192, 192, 1)",
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: "y",
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false, // ✅ Disable animation to avoid slow buildup
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
     </script>
+    
+    
 </body>
 </html>
